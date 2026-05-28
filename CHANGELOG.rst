@@ -38,6 +38,7 @@ Changelog
 **Bug Fixes**
 
 - Fix Megatron-Core HF importer to load fused ``TELayerNormColumnParallelLinear.layer_norm_weight`` from HF for GPT-family models (Qwen3 etc.) under ``--export-default-te-spec``. Importer now prefers per-context keys ``fused_input_layernorm`` / ``fused_pre_mlp_layernorm`` (fallback ``fused_norm`` for Nemotron-H backward compatibility); ``mcore_qwen.py`` provides the new rules. Without this fix, post-prune MMLU sat at chance.
+- Fix INT8 entropy calibration of fp16 ONNX models raising ``ValueError: Too many bins for data range`` on numpy >= 2.0. ``_collect_value`` in ``modelopt.onnx.quantization.ort_patching`` now casts the histogram range endpoints to Python float so bin edges are computed in float64, instead of inheriting the fp16 dtype of an activation tensor with a small range (which collapsed the 128-bin linspace under NEP-50 promotion).
 
 0.44 (2026-05-14)
 ^^^^^^^^^^^^^^^^^
