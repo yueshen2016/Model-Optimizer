@@ -134,6 +134,17 @@ class _QuantAttention(QuantModule):
         key_states = self.k_bmm_quantizer(key_states)
         value_states = self.v_bmm_quantizer(value_states)
         if not self.use_kitchen:
+            if self.softmax_quantizer.is_enabled:
+                _sq = self.softmax_quantizer
+                _orig_softmax = torch.nn.functional.softmax
+
+                def _quantized_softmax(*s_args, **s_kwargs):
+                    return _sq(_orig_softmax(*s_args, **s_kwargs))
+
+                with replace_function(torch.nn.functional, "softmax", _quantized_softmax):
+                    return original_attention_interface(
+                        self, query_states, key_states, value_states, *args, **kwargs
+                    )
             return original_attention_interface(
                 self, query_states, key_states, value_states, *args, **kwargs
             )
