@@ -22,7 +22,9 @@ import torch.nn.functional as F
 
 pytest.importorskip("transformers")
 
+import modelopt.torch.quantization as mtq
 from modelopt.torch.quantization.conversion import _normalize_fused_experts_quantizer_name
+from modelopt.torch.quantization.model_calib import local_hessian_calibrate
 from modelopt.torch.quantization.nn import QuantModuleRegistry
 from modelopt.torch.quantization.plugins.huggingface import (
     _is_fused_experts_module,
@@ -659,9 +661,6 @@ class TestFusedExpertsCalibration:
     def test_local_hessian_per_expert_capture_and_refinement(self):
         """The plugin's extension point pairs each per-expert weight quantizer with its routed
         input, and local_hessian uses that to refine every expert's weight amax."""
-        import modelopt.torch.quantization as mtq
-        from modelopt.torch.quantization.model_calib import local_hessian_calibrate
-
         model = _TinyMoEModel()
         expert_type = type(model.moe.experts)
         self._cleanup_registry(expert_type)
