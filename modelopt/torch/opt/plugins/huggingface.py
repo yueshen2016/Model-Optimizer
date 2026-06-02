@@ -134,7 +134,7 @@ def patch_pretrained_methods(cls: type, patch_methods: list[tuple[str, Any]]):
             setattr(cls, method_name, patch_method)
 
 
-def enable_huggingface_checkpointing():
+def enable_huggingface_checkpointing(skip_methods: set[str] | None = None):
     """Enables automatic save/restore of ModelOpt state with HuggingFace checkpointing APIs.
 
     ModelOpt automatically saves `modelopt_state` to `save_directory/modelopt_state.pth` when
@@ -147,6 +147,11 @@ def enable_huggingface_checkpointing():
 
 
     This function should be called once in the program before loading/saving any HuggingFace models.
+
+    Args:
+        skip_methods: Method names to leave unpatched (e.g. ``{"_from_config"}``), for models
+            whose construction invokes a patched method in a way that conflicts with the restore
+            hook. Defaults to patching every registered method.
 
     Here is an example usage:
 
@@ -163,10 +168,11 @@ def enable_huggingface_checkpointing():
         model = AutoModelForCausalLM.from_pretrained(model_path).cuda()
 
     """
+    skip_methods = set(skip_methods or ())
     for name, (classes, methods_list) in _LIBRARY_CLASSES_FOR_PATCHING.items():
         for cls, patch_methods in zip(classes, methods_list):
             if cls in _PATCHED_CLASSES:
                 continue
-            patch_pretrained_methods(cls, patch_methods)
+            patch_pretrained_methods(cls, [m for m in patch_methods if m[0] not in skip_methods])
             _PATCHED_CLASSES.add(cls)
         print_rank_0(f"ModelOpt save/restore enabled for `{name}` library.")
