@@ -305,7 +305,7 @@ nemo-evaluator-launcher run --config nemo_evaluator.yaml
 | MMLU Pro | NeMo Evaluator | 1 | `mmlu-pro_pass_at_1_symbolic_correct` |
 | GPQA Diamond | NeMo Evaluator | 8 | `gpqa_pass_at_1_avg-of-8_symbolic_correct` |
 | LiveCodeBench v6 | NeMo Evaluator | 8 | `livecodebench_pass_at_1_avg-of-8_accuracy` |
-| AIME 2025 | NeMo Evaluator | 64 | `aime25_pass_at_1_avg-of-64_symbolic_correct` |
+| AIME 2025 | NeMo Evaluator | 32 | `aime25_pass_at_1_avg-of-32_symbolic_correct` |
 | Math 500 | NeMo Evaluator | 5 | `AA_math_test_500_score_micro_avg_of_5` |
 | IFEval | NeMo Evaluator | 1 | `ifeval_pass_at_1_average_score` |
 | SciCode (Subtask) | NeMo Evaluator | 8 | `scicode_pass_at_1_avg-of-8_subtask_accuracy` |

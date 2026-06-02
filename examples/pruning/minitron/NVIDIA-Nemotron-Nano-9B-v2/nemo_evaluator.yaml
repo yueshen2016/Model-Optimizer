@@ -156,7 +156,7 @@ evaluation:
           params:
             # limit_samples: 8
             extra:
-              num_repeats: 64
+              num_repeats: 32
 
     # 5. MATH500 (Requires JUDGE_API_KEY)
     # - name: AA_math_test_500
