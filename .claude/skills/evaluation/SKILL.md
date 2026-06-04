@@ -228,7 +228,7 @@ Hostname match → set `defaults: - execution: internal/slurm/<cluster>`, drop t
 > **SLURM gotchas (invisible to `--dry-run`; surface at canary):**
 >
 > - **`mount_home: false`** — `true` mounts host `~/.cache`; a shared-fs symlink there dangles in-container → deploy dies `FileNotFoundError /root/.cache/huggingface`. Mount the real cache to `/hf-cache` + set `HF_HOME` instead.
-> - **`cpu_partition`** — else the chained CPU-only auto-export job is rejected by the GPU-only partition and fails the task despite `EVAL_EXIT_CODE=0`.
+> - **`cpu_partition: <cpu-partition>`** — needed when `auto_export` is on **and** the cluster has separate GPU/CPU partitions. NEL runs MLflow export as a *separate CPU-only* SLURM job (`--gpus 0`, `python:3.12.7-slim`) chained after the eval via `afterok`. Its partition is `execution.cpu_partition or execution.partition` — **NEL does not auto-route**, so if unset the export lands on your *GPU* partition, which such clusters reject for non-GPU jobs (`sbatch: Cannot find GPU specification …`). Because the export `sbatch` runs at the end of the eval job's script, that rejection returns non-zero and **fails the whole task even though the eval succeeded** (`EVAL_EXIT_CODE=0`, `status=SUCCESS` in the client log). Set it to the cluster's CPU partition (e.g. `cpu`); verify on the generated `export.sbatch`'s `#SBATCH --partition`.
 > - **Shared env vars** can go top-level `env_vars:` (merges into both stages) or per-stage as the example shows; `execution.env_vars` hard-errors. Stage-specific vars stay under `deployment`/`evaluation.env_vars`.
 >
 > ```yaml
