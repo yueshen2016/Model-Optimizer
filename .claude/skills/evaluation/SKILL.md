@@ -229,7 +229,7 @@ Hostname match → set `defaults: - execution: internal/slurm/<cluster>`, drop t
 >
 > - **`mount_home: false`** — `true` mounts host `~/.cache`; a shared-fs symlink there dangles in-container → deploy dies `FileNotFoundError /root/.cache/huggingface`. Mount the real cache to `/hf-cache` + set `HF_HOME` instead.
 > - **`cpu_partition`** — else the chained CPU-only auto-export job is rejected by the GPU-only partition and fails the task despite `EVAL_EXIT_CODE=0`.
-> - **Shared env vars → top-level `env_vars:`** (`execution.env_vars` hard-errors); stage-specific stay under `deployment`/`evaluation.env_vars`.
+> - **Shared env vars** can go top-level `env_vars:` (merges into both stages) or per-stage as the example shows; `execution.env_vars` hard-errors. Stage-specific vars stay under `deployment`/`evaluation.env_vars`.
 >
 > ```yaml
 > execution:
