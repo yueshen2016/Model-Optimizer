@@ -57,7 +57,7 @@ execution:
   # fails "Requested node configuration is not available" (4-GPU GB300 -> gpu:4).
   mounts:
     # ALWAYS false — never override to true (some internal/slurm/<cluster> templates
-    # default true). On clusters where ~/.cache is a lustre symlink (e.g. gcp-nrt),
+    # default true). On clusters where ~/.cache is a symlink into a shared/networked filesystem,
     # mounting home makes the container's /root/.cache dangle and the vLLM deploy dies
     # at trust-remote-code init: FileNotFoundError '/root/.cache/huggingface'. Invisible
     # to --dry-run; only shows at canary. See SKILL.md Step 4.
@@ -67,9 +67,9 @@ execution:
     # stage's env_vars (below). Sidesteps the /root/.cache symlink and reuses the existing
     # token + dataset cache:
     # deployment:
-    #   /lustre/.../<user>/.cache/huggingface: /hf-cache
+    #   <shared-fs>/<user>/.cache/huggingface: /hf-cache
     # evaluation:
-    #   /lustre/.../<user>/.cache/huggingface: /hf-cache
+    #   <shared-fs>/<user>/.cache/huggingface: /hf-cache
     # (then add `HF_HOME: lit:/hf-cache` under deployment.env_vars AND evaluation.env_vars)
   auto_export:          # REQUIRED trigger for auto-export. Without this, the
     destinations:       # export.mlflow block below is ignored and the run is

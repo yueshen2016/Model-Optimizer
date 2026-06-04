@@ -227,8 +227,9 @@ Hostname match → set `defaults: - execution: internal/slurm/<cluster>`, drop t
 
 > **ALWAYS set `execution.mounts.mount_home: false` — never leave it `true`.** Some
 > `internal/slurm/<cluster>` templates default it to `true` (e.g. `gcp-nrt`). On clusters
-> where the home dir's `~/.cache` is a **symlink into lustre**, mounting home makes the
-> container's `/root/.cache` a dangling symlink (its lustre target isn't mounted), so the
+> where the home dir's `~/.cache` is a **symlink into a shared/networked filesystem**, mounting
+> home makes the container's `/root/.cache` a dangling symlink (its target is not mounted in the
+> container), so the
 > vLLM deploy dies at `--trust-remote-code` module init with
 > `FileNotFoundError: '/root/.cache/huggingface'` (HF dataset caching breaks too). This
 > deployment failure is invisible to `--dry-run` — it only surfaces at canary. Override
