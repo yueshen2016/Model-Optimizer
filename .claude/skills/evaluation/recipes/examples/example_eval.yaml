@@ -63,11 +63,9 @@ execution:
 deployment:
   env_vars:
     HF_TOKEN: host:HF_TOKEN
-    # vLLM backend/runtime env vars go HERE (not in the command string below).
-    # Some models require a backend toggle documented on their model card — e.g.
-    # NVFP4 MoE models (NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4) need FlashInfer's
-    # FP4 MoE kernels enabled. Uncomment + set per the card; use the `lit:`
-    # prefix for these constants (prefix rule in SKILL.md Step 5):
+    # vLLM backend env vars go HERE, not in the command below. Some models need
+    # a card-documented toggle — e.g. NVFP4 MoE (NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4)
+    # needs FlashInfer FP4 kernels. Uncomment per card (`lit:` prefix, Step 5):
     #   VLLM_USE_FLASHINFER_MOE_FP4: lit:1
     #   VLLM_FLASHINFER_MOE_BACKEND: lit:throughput
   checkpoint_path: ???

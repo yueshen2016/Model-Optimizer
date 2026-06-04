@@ -84,7 +84,7 @@ nel skills build-config --execution <...> --deployment <...> --model_type <...> 
 - **vLLM:** no `--quantization` flag by default — vLLM auto-detects from `quantization_config` / `hf_quant_config.json`. Add only when the card, vLLM version, or dry-run error requires it.
 - **SGLang:** may need `--quantization modelopt_fp8` / `modelopt_fp4` / `modelopt` — verify against installed version.
 
-Some models need extra vLLM backend env vars — discovered via model card research. Examples: `VLLM_NVFP4_GEMM_BACKEND=marlin` (Nemotron Super); `VLLM_USE_FLASHINFER_MOE_FP4=1` + `VLLM_FLASHINFER_MOE_BACKEND=throughput` for NVFP4 MoE models (e.g. NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4). Put these in the `deployment.env_vars` block (**not** the `command` string), one per line with the `lit:` prefix — `VLLM_USE_FLASHINFER_MOE_FP4: lit:1`. See `example_eval.yaml` and the env-var prefix rule in Step 5.
+Some models need extra vLLM backend env vars (model-card research) — e.g. `VLLM_NVFP4_GEMM_BACKEND=marlin` (Nemotron Super), or `VLLM_USE_FLASHINFER_MOE_FP4=1` + `VLLM_FLASHINFER_MOE_BACKEND=throughput` (NVFP4 MoE, e.g. NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4). Put them in `deployment.env_vars` (**not** `command`) with the `lit:` prefix (`VLLM_USE_FLASHINFER_MOE_FP4: lit:1`); see `example_eval.yaml` and Step 5's prefix rule.
 
 **Auto-detect from `config.json`:**
 
@@ -140,7 +140,7 @@ deployment:
 
 Conventions: always start `vllm serve /checkpoint` (NEL mounts here); always `--served-model-name ${deployment.served_model_name}` (**required**; see `example_eval.yaml` for why); always `--host 0.0.0.0 --port ${deployment.port}`; use folded scalar (`>-`) for one flag per line. Example fallback `--max-model-len 131072` covers AA-LCR (~120K + 16K gen) and SciCode (≥ 65536) — prefer `config.json` / recipe value.
 
-Backend/runtime env vars (e.g. `VLLM_USE_FLASHINFER_MOE_FP4`) are **not** CLI flags — they belong in the `deployment.env_vars` block, not this `command` string (see Step 3 and `example_eval.yaml`).
+Backend env vars (e.g. `VLLM_USE_FLASHINFER_MOE_FP4`) are not CLI flags — put them in `deployment.env_vars`, not this `command` (see Step 3).
 
 For how to choose `--tensor-parallel-size` / `--data-parallel-size` / `--pipeline-parallel-size` (and EP) from the model size and your GPU count, read `references/parallelism.md` — cross-check the layout against `recipes.vllm.ai`, then adapt to the GPUs you actually have via the fit math there.
 
