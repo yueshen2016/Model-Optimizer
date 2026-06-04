@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Changelog &mdash; Model Optimizer 0.0.1.dev1+gc4a1334a8</title>
+  <title>Changelog &mdash; Model Optimizer 0.0.1.dev1+g1f5e66b69</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
@@ -205,6 +205,7 @@ The legacy FSDP1 accelerate config is removed; <code class="docutils literal not
 <ul class="simple">
 <li><p>In Megatron-Core only do EP amax sync for routed expert weights if <code class="docutils literal notranslate"><span class="pre">sync_expert_weight_amax=True</span></code>. Previously EP amax sync would sync routed expert weights across EP ranks even when <code class="docutils literal notranslate"><span class="pre">sync_expert_weight_amax</span></code> was False.</p></li>
 <li><p>Fix Megatron-Core HF importer to load fused <code class="docutils literal notranslate"><span class="pre">TELayerNormColumnParallelLinear.layer_norm_weight</span></code> from HF for GPT-family models (Qwen3 etc.) under <code class="docutils literal notranslate"><span class="pre">--export-default-te-spec</span></code>. Importer now prefers per-context keys <code class="docutils literal notranslate"><span class="pre">fused_input_layernorm</span></code> / <code class="docutils literal notranslate"><span class="pre">fused_pre_mlp_layernorm</span></code> (fallback <code class="docutils literal notranslate"><span class="pre">fused_norm</span></code> for Nemotron-H backward compatibility); <code class="docutils literal notranslate"><span class="pre">mcore_qwen.py</span></code> provides the new rules. Without this fix, post-prune MMLU sat at chance.</p></li>
+<li><p>Fix ONNX AutoCast <code class="docutils literal notranslate"><span class="pre">keep_io_types=True</span></code> sanity-check failure (<code class="docutils literal notranslate"><span class="pre">Unexpected</span> <span class="pre">type</span> <span class="pre">in</span> <span class="pre">I/O</span> <span class="pre">tensor</span> <span class="pre">...</span></code>) when a network input/output is an empty tensor (a dimension of size 0). Such tensors were “fake-cast” (retyped in place) to the low precision type; because the value-info map aliases the <code class="docutils literal notranslate"><span class="pre">graph.input</span></code>/<code class="docutils literal notranslate"><span class="pre">graph.output</span></code> <code class="docutils literal notranslate"><span class="pre">ValueInfoProto</span></code>, this silently changed the model’s I/O type. AutoCast now inserts a real <code class="docutils literal notranslate"><span class="pre">Cast</span></code> for protected I/O tensors instead.</p></li>
 </ul>
 <p><strong>Deprecations</strong></p>
 <ul class="simple">
