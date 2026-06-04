@@ -225,18 +225,18 @@ for f in "$PKG"/configs/execution/internal/slurm/*.yaml; do \
 
 Hostname match → set `defaults: - execution: internal/slurm/<cluster>`, drop the redundant `execution.hostname` (keep account/output_dir/walltime), verify with `--dry-run`. Else keep `slurm/default` and fill hostname/account/output_dir manually.
 
-> **SLURM gotchas — all invisible to `--dry-run`; they surface only at canary:**
+> **SLURM gotchas (invisible to `--dry-run`; surface at canary):**
 >
-> - **`mounts.mount_home: false` (always).** Some `internal/slurm/<cluster>` templates default `true`, mounting host `~/.cache`; if that's a symlink into a shared/networked filesystem it dangles in-container and the vLLM `--trust-remote-code` deploy dies with `FileNotFoundError: '/root/.cache/huggingface'`. Instead mount the real HF cache to `/hf-cache` and set `HF_HOME: lit:/hf-cache` (reuses token + datasets). Realpath via `ssh <host> 'realpath ~/.cache/huggingface'`.
-> - **`cpu_partition: <cpu-partition>`** when auto-export is on a split GPU/CPU cluster: the chained CPU-only export job is rejected by a GPU-only partition (`Cannot find GPU specification`) and marks the task FAILED despite `EVAL_EXIT_CODE=0`.
-> - **Shared env vars → top-level `env_vars:`** (merges into both stages; `execution.env_vars` hard-errors). Stage-specific vars stay in `deployment.env_vars` (`VLLM_*`) / `evaluation.env_vars` (`DUMMY_API_KEY`, judge keys).
+> - **`mount_home: false`** — `true` mounts host `~/.cache`; a shared-fs symlink there dangles in-container → deploy dies `FileNotFoundError /root/.cache/huggingface`. Mount the real cache to `/hf-cache` + set `HF_HOME` instead.
+> - **`cpu_partition`** — else the chained CPU-only auto-export job is rejected by the GPU-only partition and fails the task despite `EVAL_EXIT_CODE=0`.
+> - **Shared env vars → top-level `env_vars:`** (`execution.env_vars` hard-errors); stage-specific stay under `deployment`/`evaluation.env_vars`.
 >
 > ```yaml
 > execution:
 >   cpu_partition: <cpu-partition>
 >   mounts:
 >     mount_home: false
->     deployment: { <realpath ~/.cache/huggingface>: /hf-cache }
+>     deployment: { <realpath ~/.cache/huggingface>: /hf-cache }   # ssh <host> realpath ~/.cache/huggingface
 >     evaluation: { <realpath ~/.cache/huggingface>: /hf-cache }
 > env_vars: { HF_TOKEN: host:HF_TOKEN, HF_HOME: lit:/hf-cache }   # both stages
 > ```
