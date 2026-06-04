@@ -228,7 +228,7 @@ Hostname match → set `defaults: - execution: internal/slurm/<cluster>`, drop t
 > **SLURM gotchas (invisible to `--dry-run`; surface at canary):**
 >
 > - **`mount_home: false`** — `true` mounts host `~/.cache`; a shared-fs symlink there dangles in-container → deploy dies `FileNotFoundError /root/.cache/huggingface`. Mount the real cache to `/hf-cache` + set `HF_HOME` instead.
-> - **`cpu_partition: <cpu-partition>`** — **required for MLflow `auto_export` to work** on clusters with separate GPU/CPU partitions. NEL runs export as a separate CPU-only job and does not auto-route it; unset, it lands on the GPU partition, gets rejected (`Cannot find GPU specification`), and fails the task despite `EVAL_EXIT_CODE=0`. Set to the CPU partition (e.g. `cpu`).
+> - **`cpu_partition: <cpu-partition>`** — **required for MLflow `auto_export` to work** on clusters with separate GPU/CPU partitions. If not specified, NEL runs the export (a CPU-only job) on the GPU partition — it does not auto-route — which gets rejected (`Cannot find GPU specification`) and fails the task despite `EVAL_EXIT_CODE=0`. Set to the CPU partition (e.g. `cpu`).
 > - **Shared env vars** can go top-level `env_vars:` (merges into both stages) or per-stage as the example shows; `execution.env_vars` hard-errors. Stage-specific vars stay under `deployment`/`evaluation.env_vars`.
 >
 > ```yaml
