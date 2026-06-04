@@ -225,50 +225,21 @@ for f in "$PKG"/configs/execution/internal/slurm/*.yaml; do \
 
 Hostname match → set `defaults: - execution: internal/slurm/<cluster>`, drop the redundant `execution.hostname` (keep account/output_dir/walltime), verify with `--dry-run`. Else keep `slurm/default` and fill hostname/account/output_dir manually.
 
-> **ALWAYS set `execution.mounts.mount_home: false` — never leave it `true`.** Some
-> `internal/slurm/<cluster>` templates default it to `true` (e.g. `gcp-nrt`). On clusters
-> where the home dir's `~/.cache` is a **symlink into a shared/networked filesystem**, mounting
-> home makes the container's `/root/.cache` a dangling symlink (its target is not mounted in the
-> container), so the
-> vLLM deploy dies at `--trust-remote-code` module init with
-> `FileNotFoundError: '/root/.cache/huggingface'` (HF dataset caching breaks too). This
-> deployment failure is invisible to `--dry-run` — it only surfaces at canary. Override
-> `mount_home`, mount the **real** HF cache dir to a clean path (`/hf-cache`), and point
-> `HF_HOME` at it for **both** stages — this sidesteps the `/root/.cache` symlink entirely:
+> **SLURM gotchas — all invisible to `--dry-run`; they surface only at canary:**
+>
+> - **`mounts.mount_home: false` (always).** Some `internal/slurm/<cluster>` templates default `true`, mounting host `~/.cache`; if that's a symlink into a shared/networked filesystem it dangles in-container and the vLLM `--trust-remote-code` deploy dies with `FileNotFoundError: '/root/.cache/huggingface'`. Instead mount the real HF cache to `/hf-cache` and set `HF_HOME: lit:/hf-cache` (reuses token + datasets). Realpath via `ssh <host> 'realpath ~/.cache/huggingface'`.
+> - **`cpu_partition: <cpu-partition>`** when auto-export is on a split GPU/CPU cluster: the chained CPU-only export job is rejected by a GPU-only partition (`Cannot find GPU specification`) and marks the task FAILED despite `EVAL_EXIT_CODE=0`.
+> - **Shared env vars → top-level `env_vars:`** (merges into both stages; `execution.env_vars` hard-errors). Stage-specific vars stay in `deployment.env_vars` (`VLLM_*`) / `evaluation.env_vars` (`DUMMY_API_KEY`, judge keys).
 >
 > ```yaml
 > execution:
+>   cpu_partition: <cpu-partition>
 >   mounts:
 >     mount_home: false
->     deployment:
->       <realpath of ~/.cache/huggingface>: /hf-cache
->     evaluation:
->       <realpath of ~/.cache/huggingface>: /hf-cache
-> deployment:
->   env_vars:
->     HF_HOME: lit:/hf-cache
-> evaluation:
->   env_vars:
->     HF_HOME: lit:/hf-cache
+>     deployment: { <realpath ~/.cache/huggingface>: /hf-cache }
+>     evaluation: { <realpath ~/.cache/huggingface>: /hf-cache }
+> env_vars: { HF_TOKEN: host:HF_TOKEN, HF_HOME: lit:/hf-cache }   # both stages
 > ```
->
-> Resolve the realpath first — `ssh <host> 'realpath ~/.cache/huggingface'` — and mount that,
-> not the symlink. Bonus: reuses the existing HF token + dataset cache.
-
-> **Auto-export on a split GPU/CPU-partition cluster → set `execution.cpu_partition`.** MLflow
-> auto-export runs as a separate **CPU-only** SLURM job. On clusters whose GPU partition rejects
-> non-GPU jobs (e.g. gcp-nrt `batch`: *"Cannot find GPU specification … non-CPU partition"*), that
-> job fails to submit — and because it's chained off the eval job, it **marks the whole task FAILED
-> even though the eval itself succeeded** (`EVAL_EXIT_CODE=0`, `status=SUCCESS` in the client log).
-> Set `execution.cpu_partition: <cpu-partition>` (e.g. `cpu`) so NEL routes the export job there
-> (`export_partition = cfg.execution.cpu_partition or cfg.execution.partition`). Invisible to
-> `--dry-run` unless you check the generated `export.sbatch`'s `#SBATCH --partition`.
-
-> **Shared env vars → top-level `env_vars:`, not `execution.env_vars`.** `execution.env_vars` is
-> unsupported (hard-errors). A root-level `env_vars:` block (sibling of `execution`/`deployment`/
-> `evaluation`) merges into **both** the deployment and eval containers — use it for vars both need
-> (`HF_TOKEN`, `HF_HOME`). Keep stage-specific vars in `deployment.env_vars` (e.g. `VLLM_*`) /
-> `evaluation.env_vars` (e.g. `DUMMY_API_KEY`, judge keys).
 
 - Find every `???` left. Ask the user only for what can't be inferred (SLURM hostname/account/output_dir, MLflow tracking URI, etc.). Don't propose defaults; let them give plain text.
 - **`parallelism`** — size it yourself from the run shape (total requests = `dataset_size × repeats` vs GPU serving capacity), and set `--max-num-seqs` to match. Read `references/parallelism.md` for the decision rule and worked examples; only ask the user if a non-GPU cap (e.g. judge rate limit) is unknown.
