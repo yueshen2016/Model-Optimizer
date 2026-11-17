@@ -120,12 +120,12 @@ class NVFP4QTensor(BaseQuantizedTensor):
         m_fp8 = fp8_max_for_normalization(weight_quantizer)
         global_amax = cls._get_static_global_amax(weight_quantizer)
         if global_amax is not None:
-            return (global_amax.float().double() / (E2M1_MAX * m_fp8)).float()
+            return global_amax.float() / (E2M1_MAX * m_fp8)
         else:
             assert hasattr(weight_quantizer, "_amax"), (
                 "Weight quantizer does not have attribute amax"
             )
-            return (weight_quantizer._amax.float().double() / (E2M1_MAX * m_fp8)).float()
+            return weight_quantizer._amax.float() / (E2M1_MAX * m_fp8)
 
     @classmethod
     def get_weights_scaling_factor_from_quantizer(
@@ -226,7 +226,7 @@ class NVFP4QTensor(BaseQuantizedTensor):
     @classmethod
     def get_weights_scaling_factor_2(cls, input: torch.Tensor):
         """Returns per tensor weight scaling factor."""
-        return (reduce_amax(input).float().double() / (E2M1_MAX * E4M3_MAX)).float()
+        return reduce_amax(input).float() / (E2M1_MAX * E4M3_MAX)
 
     @classmethod
     def get_activation_scaling_factor(cls, quantizer):
@@ -240,11 +240,7 @@ class NVFP4QTensor(BaseQuantizedTensor):
         if amax is None:
             return None
 
-        # Round once to FP32 after higher-precision division so export metadata
-        # is unchanged by CUDA's FP32 reciprocal rounding.
-        activation_scaling_factor = (
-            amax.float().double() / (quantizer.maxbound * E4M3_MAX)
-        ).float()
+        activation_scaling_factor = amax.float() / (quantizer.maxbound * E4M3_MAX)
 
         assert torch.all(activation_scaling_factor > 0), (
             f" activation scaling factor {activation_scaling_factor} not positive."
