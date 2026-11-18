@@ -37,6 +37,8 @@ Changelog
 
 **Bug Fixes**
 
+- Add an explicit Megatron-Bridge PTQ attention backend override so calibration can allow fallback when a provider pins a fused backend.
+
 *Quantization*
 
 *ONNX*
