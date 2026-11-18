@@ -27,6 +27,8 @@ Changelog
 
 - The Megatron-Bridge examples accept frozen token JSONL calibration and an explicit ``--export_backend bridge`` for real-quant HF checkpoints. The existing ModelOpt export backend remains the default.
 
+- Megatron-Bridge distillation accepts local configuration overrides and native training callbacks. Explicit grouped-expert selection, checkpoint storage precision restoration and chunked KL options support reusable QAD workflows.
+
 *Misc*
 
 **Backward Breaking Changes**
