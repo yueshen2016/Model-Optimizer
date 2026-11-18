@@ -47,6 +47,8 @@ Changelog
 
 *Megatron Framework (M-LM / M-Bridge)*
 
+- Preserve model-specific hybrid stacks when selecting MoE expert layouts in Megatron-Bridge, and reject grouped GEMM when a custom factory returns sequential experts. Custom built ``ModuleSpec`` values are now rejected; assign a named factory function instead.
+
 *Misc*
 
 0.49.0 (2026-12-xx)
@@ -109,6 +111,7 @@ Changelog
 *Megatron Framework (M-LM / M-Bridge)*
 
 - Add ``--output_qdq_weight`` to Megatron-Bridge PTQ to save decoded floating-point weights with ModelOpt state for QAD; GGML IQ super-block scales remain fixed during training. Custom PTQ pipelines can call ``mtq.initialize_qdq_weights(model)``.
+- Add optional ``logit_kl_chunk_size`` for TP1 full-vocabulary distillation, bounding FP32 temporary memory in both the forward and backward pass.
 - Add ``--trainable_params`` (alias ``--trainable_parameter_patterns``) to ``examples/megatron_bridge/distill.py`` to train selected student weights, including full-rank routed-expert QAD. Reuse the selection on native resume.
 - Add ``--sft_in_batch_packing``, ``--moe_aux_loss_coeff`` and ``--dsa_kernel_backend`` to ``examples/megatron_bridge/distill.py`` (``--dsa_kernel_backend`` also to ``quantize.py``): pack ``--sft_hf_dataset`` conversations per micro-batch instead of padding each to ``--seq_length``, override the MoE load-balancing loss weight (e.g. 0 for padded SFT data), and select fused DeepSeek sparse-attention kernels for long sequences.
 - Add opt-in revision-pinned chat-blend preparation with indexed programming-question recovery, complete-record deduplication, question-isolated validation, and source shortfall/provenance reports.
@@ -171,6 +174,7 @@ Changelog
 
 *Quantization*
 
+- Preserve model-specific hybrid stack components when selecting the MoE expert layout in Megatron-Bridge.
 - QAT and QAD of the GGML formats (IQ, ``q8_0``) now re-encode trainable weights after every optimizer step, including under optimizers that write weights through a shared buffer or ``.data`` such as Megatron's distributed optimizer. With those optimizers the GGML codes used to stay those of each job's first forward, so re-run earlier Megatron QAD of these formats.
 - Megatron-Core fake quantization of Gated DeltaNet (Qwen3.5 / Qwen3.6) with a Transformer Engine ``in_proj`` now keeps its beta / alpha gates in BF16 during evaluation, QAD, ``fold_weight`` and the vLLM fake-quant export, matching deployment. Other ``in_proj`` layers stay fully quantized and warn.
 - AWQ-Clip's per-tensor clip, which ``nvfp4_awq_clip`` uses, is now searched over every data-parallel rank's data, as its block-wise clip already was, so the replicas of a weight take the same clip (exported amax values of data-parallel runs may change) and ``nvfp4_awq_clip`` works with ``examples/hf_ptq/hf_ptq.py --use_fsdp2`` on several GPUs.
