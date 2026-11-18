@@ -89,7 +89,7 @@ except ImportError:
     HAS_GDN = False
 
 
-__all__ = []
+__all__ = ["register_attention_quantizer"]
 
 
 def _check_nvfp4_static_tp_supported(model: torch.nn.Module) -> None:
@@ -1114,6 +1114,18 @@ class _QuantCoreAttention(QuantModule):
         # Affine KVCache Quant bias vector.
         state_dict = self.state_dict(prefix="", keep_vars=True)
         return make_sharded_tensors_for_checkpoint(state_dict, prefix, {}, sharded_offsets)
+
+
+def register_attention_quantizer(attention_type: type[torch.nn.Module], name: str) -> None:
+    """Register a compatible Core attention subclass whose forward overrides its parent.
+
+    The subclass must accept query, key and value as its first three arguments.
+    Call before converting a model or restoring its quantizers.
+    """
+    if not issubclass(attention_type, TEDotProductAttention):
+        raise TypeError("Expected a TEDotProductAttention subclass.")
+    if attention_type not in QuantModuleRegistry:
+        QuantModuleRegistry.register({attention_type: name})(_QuantCoreAttention)
 
 
 if HAS_DSA:

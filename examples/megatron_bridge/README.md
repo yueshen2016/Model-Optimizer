@@ -642,3 +642,23 @@ python generate_vllm.py --model /tmp/Qwen3-8B-Pruned-6B
 - 💡 [Release Notes](https://nvidia.github.io/Model-Optimizer/reference/0_changelog.html)
 - 🐛 [File a bug](https://github.com/NVIDIA/Model-Optimizer/issues/new?template=1_bug_report.md)
 - ✨ [File a Feature Request](https://github.com/NVIDIA/Model-Optimizer/issues/new?template=2_feature_request.md)
+
+### Model and runtime overrides for distillation
+
+`distill.py --config_overrides local.yaml` accepts a trusted local YAML mapping
+of existing Bridge config fields. The `model` fields configure both providers
+before construction; other sections override the assembled training config.
+Unknown fields and incompatible value types fail before overrides are applied.
+Use CLI arguments for dataset/model/output paths and parallelism; use the YAML
+for provider or optimizer settings without introducing another training entrypoint.
+
+An optional `callbacks` list contains fully qualified `_target_` factories and
+constructor arguments. It requires a Bridge `distill()` API that forwards native
+training callbacks. Callback modules must already be on `PYTHONPATH`.
+`--preserve_checkpoint_dtype` retains the initial student's saved floating dtypes;
+`--moe_grouped_gemm` explicitly matches a grouped PTQ initialization.
+`--logit_kl_chunk_size` requires a ModelOpt distillation config exposing that field.
+
+The quantized exporter accepts `--provider_overrides local.yaml` for existing
+provider fields needed to construct a trained checkpoint. Explicit topology CLI
+arguments take precedence over that provider file.

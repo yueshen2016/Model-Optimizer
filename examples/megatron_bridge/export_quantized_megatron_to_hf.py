@@ -54,6 +54,7 @@ import json
 from pathlib import Path
 
 import torch
+from config_overrides import read_overrides
 from megatron.bridge import AutoBridge
 from megatron.bridge.models.conversion.model_bridge import MegatronModelBridge
 from megatron.bridge.models.hf_pretrained.utils import is_safe_repo
@@ -100,6 +101,11 @@ EXPORT = Tool(
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        "--provider_overrides",
+        type=Path,
+        help="Trusted local YAML provider fields used to construct this checkpoint.",
+    )
     parser.add_argument(
         "--hf_model_name_or_path",
         type=str,
@@ -285,6 +291,7 @@ def main(args: argparse.Namespace):
             force_grouped=args.moe_grouped_gemm,
         ),
         provider_overrides={
+            **read_overrides(args.provider_overrides),
             "tensor_model_parallel_size": args.tp_size,
             "pipeline_model_parallel_size": args.pp_size,
             "expert_model_parallel_size": args.ep_size,

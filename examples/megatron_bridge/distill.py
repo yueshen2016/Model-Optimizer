@@ -27,6 +27,7 @@ import os
 from pathlib import Path
 
 import torch
+from config_overrides import apply_overrides, build_callbacks, read_overrides
 from export_distilled_megatron_to_hf import export_llm_to_hf, save_vlm_to_hf
 from megatron.bridge import AutoBridge
 from megatron.bridge.models.distillation_provider import convert_to_distillation_provider
@@ -147,6 +148,25 @@ def _hf_source(spec: str) -> "HFDatasetSourceConfig":
 def get_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Distillation for Megatron-Bridge.")
+    parser.add_argument(
+        "--config_overrides", type=Path, help="Trusted local YAML config overrides and callbacks."
+    )
+    parser.add_argument(
+        "--preserve_checkpoint_dtype",
+        action="store_true",
+        help="Restore floating checkpoint storage dtypes before loading student tensors.",
+    )
+    parser.add_argument(
+        "--moe_grouped_gemm",
+        action="store_true",
+        help="Explicitly use grouped experts for a quantized student.",
+    )
+    parser.add_argument(
+        "--logit_kl_chunk_size",
+        type=_positive_int,
+        default=None,
+        help="Bound full-vocabulary KL temporaries by this many tokens.",
+    )
     # Model arguments (HF teacher, HF or Megatron student)
     parser.add_argument(
         "--student_hf_path",
@@ -649,6 +669,26 @@ class FakeQuantWeightCache(Callback):
 
 def main(args: argparse.Namespace, owns_the_run: bool = True):
     """Build the student and teacher providers, then run Megatron-Bridge distillation."""
+    overrides = read_overrides(args.config_overrides)
+    callback_specs = overrides.pop("callbacks", [])
+    allowed = {
+        "model",
+        "train",
+        "validation",
+        "optimizer",
+        "scheduler",
+        "ddp",
+        "dataset",
+        "logger",
+        "tokenizer",
+        "checkpoint",
+        "rng",
+        "dist",
+    }
+    if unknown := overrides.keys() - allowed:
+        raise ValueError(f"Unknown config sections: {sorted(unknown)}")
+    if args.moe_grouped_gemm and args.no_moe_grouped_gemm:
+        raise ValueError("Grouped and sequential expert layouts are mutually exclusive.")
     # --student_hf_path stays as given. The student is built and exported from the local copy of
     # the whole checkpoint in student_local_checkpoint_path, since the HF export reads the source's
     # files from local disk only; student_hub_model_id is the Hub ID, or None for a local path.
@@ -672,6 +712,7 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
             args.student_local_checkpoint_path,
             trust_remote_code=args.trust_remote_code,
             force_sequential=args.no_moe_grouped_gemm,
+            force_grouped=args.moe_grouped_gemm,
         )
         if student_has_modelopt_state
         else not args.no_moe_grouped_gemm
@@ -701,6 +742,7 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
         provider.seq_length = args.seq_length
         if args.dsa_kernel_backend is not None:
             provider.dsa_kernel_backend = args.dsa_kernel_backend
+        apply_overrides(provider, overrides.get("model", {}))
         set_moe_expert_layout(provider, moe_grouped_gemm)
         if args.moe_aux_loss_coeff is not None:
             provider.moe_aux_loss_coeff = args.moe_aux_loss_coeff
@@ -712,6 +754,8 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
             provider.recompute_num_layers = args.recompute_num_layers
             if args.recompute_modules is not None:
                 provider.recompute_modules = args.recompute_modules
+        if overrides.get("model"):
+            provider.finalize()
         return provider
 
     # The student structure is always built from --student_hf_path. When --student_megatron_path is
@@ -747,6 +791,11 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
             f"sizes differ ({padded['student']} vs {padded['teacher']})."
         )
 
+    kd_options = {}
+    if args.logit_kl_chunk_size is not None:
+        if "logit_kl_chunk_size" not in ModelOptDistillConfig.__dataclass_fields__:
+            raise ValueError("Chunked KL requires a compatible ModelOpt distillation config.")
+        kd_options["logit_kl_chunk_size"] = args.logit_kl_chunk_size
     kd_config = ModelOptDistillConfig(
         kd_loss_alpha=args.kd_loss_alpha,
         logit_kl_topk=args.logit_kl_top_k,
@@ -754,6 +803,7 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
         logit_kl_top_p_min_k=args.logit_kl_top_p_min_k,
         freeze_mtp=args.freeze_mtp,
         skip_frozen_mtp=args.skip_frozen_mtp,
+        **kd_options,
     )
 
     # HF VLM configs expose ``vision_config``; Megatron-Bridge nests the text model under
@@ -801,7 +851,11 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
                 f"Loading student weights from Megatron checkpoint {args.student_megatron_path}"
             )
             student = unwrap_model(model_chunks[0])
-            loaded = load_modelopt_megatron_checkpoint([student], args.student_megatron_path)
+            loaded = load_modelopt_megatron_checkpoint(
+                [student],
+                args.student_megatron_path,
+                preserve_checkpoint_dtype=args.preserve_checkpoint_dtype,
+            )
             if is_vlm and student_has_modelopt_state and loaded[0] is student:
                 # PTQ stores the state on the VLM root (it quantizes and saves the whole VLM), but
                 # only ``language_model`` is distilled and checkpointed here, so move it there to
@@ -979,12 +1033,18 @@ def main(args: argparse.Namespace, owns_the_run: bool = True):
         mixed_precision="bf16_mixed",
     )
 
+    apply_overrides(config, {key: value for key, value in overrides.items() if key != "model"})
+    callbacks = build_callbacks(callback_specs)
+    if args.fake_quant_weight_cache:
+        callbacks.append(FakeQuantWeightCache())
+    if callbacks and "callbacks" not in inspect.signature(distill).parameters:
+        raise ValueError("Callbacks require a compatible Megatron-Bridge distill() API.")
     print_rank_0("\nStarting distillation...")
     # Before training: a resumed run starts with the previous run's checkpoint in place, so
     # only a move in this marker shows that this run saved one of its own.
     saved_before = checkpoint_marker(args, DISTILL)
     # Only a newer Megatron-Bridge's distill() takes callbacks, so pass them only when needed.
-    distill_kwargs = {"callbacks": [FakeQuantWeightCache()]} if args.fake_quant_weight_cache else {}
+    distill_kwargs = {"callbacks": callbacks} if callbacks else {}
     try:
         distill(config, **distill_kwargs)
     finally:
